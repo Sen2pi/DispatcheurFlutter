@@ -46,7 +46,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  // ✅ CORRIGIDO: Retorna Future<bool>
   Future<bool> login({
     required String email,
     required String password,
@@ -66,28 +65,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
       );
 
-      return true; // ✅ Retorna bool
+      return true;
     } catch (e) {
       state = state.copyWith(
         error: e.toString(),
         isLoading: false,
         isAuthenticated: false,
       );
-      return false; // ✅ Retorna bool
+      return false;
     }
   }
 
-  // ✅ ADICIONADO: Método updateUserStatus
   Future<void> updateUserStatus(UserStatus status) async {
     final currentUser = state.user;
     if (currentUser == null) return;
 
     try {
       final updatedUser = currentUser.copyWith(status: status);
-
-      // TODO: Implementar API call para atualizar status
-      // await _authService.updateUserStatus(status);
-
+      await _authService.updateUserStatus(status);
       state = state.copyWith(user: updatedUser);
     } catch (e) {
       state = state.copyWith(error: e.toString());

@@ -1,30 +1,24 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
 
 part 'note_model.freezed.dart';
 part 'note_model.g.dart';
 
 enum NoteType {
-  @HiveField(0)
   general,
-  @HiveField(1)
   call,
-  @HiveField(2)
   meeting,
-  @HiveField(3)
   reminder,
 }
 
 @freezed
-@HiveType(typeId: 1)
 class NoteModel with _$NoteModel {
   const factory NoteModel({
-    @HiveField(0) required String id,
-    @HiveField(1) required String content,
-    @HiveField(2) required DateTime createdAt,
-    @HiveField(3) DateTime? updatedAt,
-    @HiveField(4) @Default(NoteType.general) NoteType type,
-    @HiveField(5) String? associatedCallId,
+    required String id,
+    required String content,
+    required DateTime createdAt,
+    DateTime? updatedAt,
+    @Default(NoteType.general) NoteType type,
+    String? associatedCallId,
   }) = _NoteModel;
 
   factory NoteModel.fromJson(Map<String, dynamic> json) =>

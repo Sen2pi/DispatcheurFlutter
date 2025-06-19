@@ -1,28 +1,25 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
 
 part 'contact_model.freezed.dart';
 part 'contact_model.g.dart';
 
 @freezed
-@HiveType(typeId: 0)
 class ContactModel with _$ContactModel {
   const factory ContactModel({
-    @HiveField(0) required String id,
-    @HiveField(1) required String name,
-    @HiveField(2) String? mobile,
-    @HiveField(3) String? landline,
-    @HiveField(4) String? email,
-    @HiveField(5) @Default(false) bool personal,
-    @HiveField(6) DateTime? createdAt,
-    @HiveField(7) DateTime? updatedAt,
+    required String id,
+    required String name,
+    String? mobile,
+    String? landline,
+    String? email,
+    @Default(false) bool personal,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) = _ContactModel;
 
   factory ContactModel.fromJson(Map<String, dynamic> json) =>
       _$ContactModelFromJson(json);
 }
 
-// Extension para getters customizados
 extension ContactModelExtension on ContactModel {
   String get initials {
     final nameParts = name.split(' ');

@@ -44,21 +44,31 @@ class VoipCredentials with _$VoipCredentials {
       _$VoipCredentialsFromJson(json);
 }
 
+@JsonEnum()
 enum UserRole {
+  @JsonValue('admin')
   admin,
+  @JsonValue('manager')
   manager,
+  @JsonValue('user')
   user,
+  @JsonValue('guest')
   guest,
 }
 
+@JsonEnum()
 enum UserStatus {
+  @JsonValue('online')
   online,
+  @JsonValue('away')
   away,
+  @JsonValue('busy')
   busy,
+  @JsonValue('offline')
   offline,
 }
 
-// ✅ EXTENSIONS NECESSÁRIAS
+// ✅ EXTENSIONS OBRIGATÓRIAS - FORA DA CLASSE FREEZED
 extension UserModelExtensions on UserModel {
   String get initials {
     final words = name.split(' ');

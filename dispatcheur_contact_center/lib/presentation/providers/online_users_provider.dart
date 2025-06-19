@@ -17,7 +17,6 @@ class OnlineUsersState with _$OnlineUsersState {
   }) = _OnlineUsersState;
 }
 
-// ✅ EXTENSION PARA ADICIONAR totalActive
 extension OnlineUsersStateExtension on OnlineUsersState {
   int get totalActive => users.where((user) => user.isActive).length;
 
@@ -42,7 +41,6 @@ class OnlineUsersNotifier extends StateNotifier<OnlineUsersState> {
       fetchOnlineUsers();
     });
 
-    // Fetch inicial
     fetchOnlineUsers();
   }
 

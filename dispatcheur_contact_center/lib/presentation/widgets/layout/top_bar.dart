@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/online_users_provider.dart';
-import '../../data/models/user_model.dart'; // ✅ IMPORT ADICIONADO
+import '../../../data/models/user_model.dart'; // ✅ IMPORT CORRETO
 
 class TopBar extends ConsumerWidget implements PreferredSizeWidget {
   const TopBar({super.key});
@@ -58,7 +58,6 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
             ),
           ),
           const Spacer(),
-          // Indicador de utilizadores online
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -79,7 +78,7 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${onlineUsersState.totalActive} online', // ✅ CORRIGIDO
+                  '${onlineUsersState.totalActive} online',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -92,7 +91,6 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
-        // Notificações
         IconButton(
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
           onPressed: () {
@@ -101,11 +99,8 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
             );
           },
         ),
-
-        // Menu do perfil
         if (user != null)
           PopupMenuButton<String>(
-            // ✅ CORRIGIDO: Adicionado tipo <String>
             offset: const Offset(0, 50),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -187,9 +182,7 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                 ],
               ),
             ),
-            // ✅ CORRIGIDO: itemBuilder retorna PopupMenuEntry<String>
             itemBuilder: (context) => [
-              // Informações do perfil
               PopupMenuItem<String>(
                 enabled: false,
                 value: 'info',
@@ -224,8 +217,6 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-
-              // Mudar status
               PopupMenuItem<String>(
                 value: 'status',
                 child: const Row(
@@ -236,8 +227,6 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-
-              // Perfil
               PopupMenuItem<String>(
                 value: 'profile',
                 child: const Row(
@@ -248,8 +237,6 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-
-              // Configurações
               PopupMenuItem<String>(
                 value: 'settings',
                 child: const Row(
@@ -260,10 +247,7 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-
               const PopupMenuDivider(),
-
-              // Logout
               PopupMenuItem<String>(
                 value: 'logout',
                 child: const Row(
@@ -297,7 +281,6 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
               }
             },
           ),
-
         const SizedBox(width: 16),
       ],
     );

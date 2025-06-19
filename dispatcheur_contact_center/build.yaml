@@ -3,12 +3,8 @@ targets:
     builders:
       freezed:
         options:
-          # Formatar ficheiros gerados
+          # Garantir geração adequada
           format: true
-      hive_generator:
-        options:
-          # Configurações do Hive
-          auto_format: true
       json_serializable:
         options:
           # Configurações JSON
