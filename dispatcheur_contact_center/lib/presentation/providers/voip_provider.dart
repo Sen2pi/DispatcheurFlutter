@@ -1,30 +1,70 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../services/voip_engine.dart';
 import '../../data/models/call_model.dart';
-import '../../core/errors/exceptions.dart';
 
-part 'voip_provider.freezed.dart';
+class VoipState {
+  final List<CallModel> activeCalls;
+  final VoipEngineState engineState;
+  final bool isConnected;
+  final bool isRegistered;
+  final bool isConnecting;
+  final String? error;
+  final String? currentUser;
+  final String? selectedMicrophone;
+  final String? selectedSpeaker;
+  final List<dynamic> availableMicrophones;
+  final List<dynamic> availableSpeakers;
+  final String? activeCallId;
+  final int maxConcurrentCalls;
 
-@freezed
-class VoipState with _$VoipState {
-  const factory VoipState({
-    @Default([]) List<CallModel> activeCalls,
-    @Default(VoipEngineState.disconnected) VoipEngineState engineState,
-    @Default(false) bool isConnected,
-    @Default(false) bool isRegistered,
-    @Default(false) bool isConnecting,
+  const VoipState({
+    this.activeCalls = const [],
+    this.engineState = VoipEngineState.disconnected,
+    this.isConnected = false,
+    this.isRegistered = false,
+    this.isConnecting = false,
+    this.error,
+    this.currentUser,
+    this.selectedMicrophone,
+    this.selectedSpeaker,
+    this.availableMicrophones = const [],
+    this.availableSpeakers = const [],
+    this.activeCallId,
+    this.maxConcurrentCalls = 10,
+  });
+
+  VoipState copyWith({
+    List<CallModel>? activeCalls,
+    VoipEngineState? engineState,
+    bool? isConnected,
+    bool? isRegistered,
+    bool? isConnecting,
     String? error,
     String? currentUser,
     String? selectedMicrophone,
     String? selectedSpeaker,
-    @Default([]) List<MediaDeviceInfo> availableMicrophones,
-    @Default([]) List<MediaDeviceInfo> availableSpeakers,
+    List<dynamic>? availableMicrophones,
+    List<dynamic>? availableSpeakers,
     String? activeCallId,
-    @Default(10) int maxConcurrentCalls,
-  }) = _VoipState;
+    int? maxConcurrentCalls,
+  }) {
+    return VoipState(
+      activeCalls: activeCalls ?? this.activeCalls,
+      engineState: engineState ?? this.engineState,
+      isConnected: isConnected ?? this.isConnected,
+      isRegistered: isRegistered ?? this.isRegistered,
+      isConnecting: isConnecting ?? this.isConnecting,
+      error: error ?? this.error,
+      currentUser: currentUser ?? this.currentUser,
+      selectedMicrophone: selectedMicrophone ?? this.selectedMicrophone,
+      selectedSpeaker: selectedSpeaker ?? this.selectedSpeaker,
+      availableMicrophones: availableMicrophones ?? this.availableMicrophones,
+      availableSpeakers: availableSpeakers ?? this.availableSpeakers,
+      activeCallId: activeCallId ?? this.activeCallId,
+      maxConcurrentCalls: maxConcurrentCalls ?? this.maxConcurrentCalls,
+    );
+  }
 }
 
 class VoipNotifier extends StateNotifier<VoipState> {
@@ -47,18 +87,20 @@ class VoipNotifier extends StateNotifier<VoipState> {
         isConnected: _voipEngine.isConnected,
         isRegistered: _voipEngine.isRegistered,
         currentUser: _voipEngine.currentUser,
+        selectedMicrophone: _voipEngine.selectedMicrophone,
+        selectedSpeaker: _voipEngine.selectedSpeaker,
+        availableMicrophones: _voipEngine.availableMicrophones,
+        availableSpeakers: _voipEngine.availableSpeakers,
+        activeCallId: _voipEngine.activeCallId,
+        maxConcurrentCalls: _voipEngine.maxConcurrentCalls,
       );
     });
-
-    // Atualizar dispositivos de áudio
-    _updateAudioDevices();
   }
 
   Future<void> initialize() async {
     try {
       state = state.copyWith(isConnecting: true, error: null);
       await _voipEngine.initialize();
-      await _updateAudioDevices();
       state = state.copyWith(isConnecting: false);
     } catch (e) {
       state = state.copyWith(
@@ -98,28 +140,8 @@ class VoipNotifier extends StateNotifier<VoipState> {
     }
   }
 
-  Future<void> disconnect() async {
-    try {
-      await _voipEngine.disconnect();
-      state = state.copyWith(
-        isConnected: false,
-        isRegistered: false,
-        currentUser: null,
-        activeCalls: [],
-        error: null,
-      );
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
-  }
-
   Future<String> makeCall(String destination) async {
     try {
-      if (state.activeCalls.length >= state.maxConcurrentCalls) {
-        throw VoipException(
-            'Limite máximo de ${state.maxConcurrentCalls} chamadas atingido');
-      }
-
       return await _voipEngine.makeCall(destination);
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -184,7 +206,6 @@ class VoipNotifier extends StateNotifier<VoipState> {
   Future<void> setMicrophone(String deviceId) async {
     try {
       await _voipEngine.setSelectedMicrophone(deviceId);
-      state = state.copyWith(selectedMicrophone: deviceId);
     } catch (e) {
       state = state.copyWith(error: e.toString());
       rethrow;
@@ -194,7 +215,6 @@ class VoipNotifier extends StateNotifier<VoipState> {
   Future<void> setSpeaker(String deviceId) async {
     try {
       await _voipEngine.setSelectedSpeaker(deviceId);
-      state = state.copyWith(selectedSpeaker: deviceId);
     } catch (e) {
       state = state.copyWith(error: e.toString());
       rethrow;
@@ -202,20 +222,7 @@ class VoipNotifier extends StateNotifier<VoipState> {
   }
 
   void setActiveCall(String callId) {
-    state = state.copyWith(activeCallId: callId);
-  }
-
-  Future<void> _updateAudioDevices() async {
-    try {
-      state = state.copyWith(
-        availableMicrophones: _voipEngine.availableMicrophones,
-        availableSpeakers: _voipEngine.availableSpeakers,
-        selectedMicrophone: _voipEngine.selectedMicrophone,
-        selectedSpeaker: _voipEngine.selectedSpeaker,
-      );
-    } catch (e) {
-      print('Erro ao atualizar dispositivos de áudio: $e');
-    }
+    _voipEngine.setActiveCall(callId);
   }
 
   void clearError() {

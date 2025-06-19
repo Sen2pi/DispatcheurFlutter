@@ -4,52 +4,46 @@ import 'package:hive/hive.dart';
 part 'note_model.freezed.dart';
 part 'note_model.g.dart';
 
+enum NoteType {
+  @HiveField(0)
+  general,
+  @HiveField(1)
+  call,
+  @HiveField(2)
+  meeting,
+  @HiveField(3)
+  reminder,
+}
+
 @freezed
-@HiveType(typeId: 4)
+@HiveType(typeId: 1)
 class NoteModel with _$NoteModel {
   const factory NoteModel({
     @HiveField(0) required String id,
     @HiveField(1) required String content,
     @HiveField(2) required DateTime createdAt,
     @HiveField(3) DateTime? updatedAt,
-    @HiveField(4) String? callId,
-    @HiveField(5) String? contactId,
-    @HiveField(6) @Default([]) List<String> tags,
-    @HiveField(7) @Default(false) bool isPinned,
-    @HiveField(8) NoteType? type,
-    @HiveField(9) Map<String, dynamic>? metadata,
+    @HiveField(4) @Default(NoteType.general) NoteType type,
+    @HiveField(5) String? associatedCallId,
   }) = _NoteModel;
 
   factory NoteModel.fromJson(Map<String, dynamic> json) =>
       _$NoteModelFromJson(json);
 }
 
-@HiveType(typeId: 5)
-enum NoteType {
-  @HiveField(0)
-  general,
-  @HiveField(1)
-  callNote,
-  @HiveField(2)
-  reminder,
-  @HiveField(3)
-  important,
-}
-
-extension NoteModelExtensions on NoteModel {
+extension NoteModelExtension on NoteModel {
   String get formattedDate {
-    final date = updatedAt ?? createdAt;
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
-  bool get isRecent {
     final now = DateTime.now();
-    final date = updatedAt ?? createdAt;
-    return now.difference(date).inHours < 24;
-  }
+    final difference = now.difference(createdAt);
 
-  String get preview {
-    if (content.length <= 50) return content;
-    return '${content.substring(0, 47)}...';
+    if (difference.inDays > 0) {
+      return '${difference.inDays} dia${difference.inDays > 1 ? 's' : ''} atrás';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hora${difference.inHours > 1 ? 's' : ''} atrás';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minuto${difference.inMinutes > 1 ? 's' : ''} atrás';
+    } else {
+      return 'Agora mesmo';
+    }
   }
 }

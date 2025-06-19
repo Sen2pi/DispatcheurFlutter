@@ -1,62 +1,85 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:flutter/foundation.dart';
 
-part 'call_model.freezed.dart';
-part 'call_model.g.dart';
+enum CallDirection { incoming, outgoing }
 
-@freezed
-@HiveType(typeId: 0)
-class CallModel with _$CallModel {
-  const factory CallModel({
-    @HiveField(0) required String id,
-    @HiveField(1) required String destination,
-    @HiveField(2) required CallDirection direction,
-    @HiveField(3) required CallState state,
-    @HiveField(4) required DateTime startTime,
-    @HiveField(5) @Default(false) bool isHeld,
-    @HiveField(6) @Default(false) bool isConference,
-    @HiveField(7) @Default(false) bool isMuted,
-    @HiveField(8) @Default(false) bool isActive,
-    @HiveField(9) String? displayName,
-    @HiveField(10) DateTime? answeredTime,
-    @HiveField(11) DateTime? endTime,
-    @HiveField(12) @Default([]) List<String> participants,
-    @HiveField(13) String? transferTarget,
-    @HiveField(14) @Default(false) bool isOutbound,
-    @HiveField(15) Map<String, dynamic>? metadata,
-  }) = _CallModel;
+enum CallState { connecting, ringing, established, held, ended, failed }
 
-  factory CallModel.fromJson(Map<String, dynamic> json) =>
-      _$CallModelFromJson(json);
-}
+@immutable
+class CallModel {
+  const CallModel({
+    required this.id,
+    required this.destination,
+    required this.direction,
+    required this.state,
+    required this.startTime,
+    this.isHeld = false,
+    this.isConference = false,
+    this.isMuted = false,
+    this.isActive = false,
+    this.displayName,
+    this.answeredTime,
+    this.endTime,
+    this.participants = const [],
+    this.transferTarget,
+    this.isOutbound = false,
+    this.metadata = const {},
+  });
 
-@HiveType(typeId: 1)
-enum CallDirection {
-  @HiveField(0)
-  incoming,
-  @HiveField(1)
-  outgoing,
-}
+  final String id;
+  final String destination;
+  final CallDirection direction;
+  final CallState state;
+  final DateTime startTime;
+  final bool isHeld;
+  final bool isConference;
+  final bool isMuted;
+  final bool isActive;
+  final String? displayName;
+  final DateTime? answeredTime;
+  final DateTime? endTime;
+  final List<String> participants;
+  final String? transferTarget;
+  final bool isOutbound;
+  final Map<String, dynamic> metadata;
 
-@HiveType(typeId: 2)
-enum CallState {
-  @HiveField(0)
-  connecting,
-  @HiveField(1)
-  ringing,
-  @HiveField(2)
-  established,
-  @HiveField(3)
-  held,
-  @HiveField(4)
-  ended,
-  @HiveField(5)
-  failed,
-  @HiveField(6)
-  terminated,
-}
+  CallModel copyWith({
+    String? id,
+    String? destination,
+    CallDirection? direction,
+    CallState? state,
+    DateTime? startTime,
+    bool? isHeld,
+    bool? isConference,
+    bool? isMuted,
+    bool? isActive,
+    String? displayName,
+    DateTime? answeredTime,
+    DateTime? endTime,
+    List<String>? participants,
+    String? transferTarget,
+    bool? isOutbound,
+    Map<String, dynamic>? metadata,
+  }) {
+    return CallModel(
+      id: id ?? this.id,
+      destination: destination ?? this.destination,
+      direction: direction ?? this.direction,
+      state: state ?? this.state,
+      startTime: startTime ?? this.startTime,
+      isHeld: isHeld ?? this.isHeld,
+      isConference: isConference ?? this.isConference,
+      isMuted: isMuted ?? this.isMuted,
+      isActive: isActive ?? this.isActive,
+      displayName: displayName ?? this.displayName,
+      answeredTime: answeredTime ?? this.answeredTime,
+      endTime: endTime ?? this.endTime,
+      participants: participants ?? this.participants,
+      transferTarget: transferTarget ?? this.transferTarget,
+      isOutbound: isOutbound ?? this.isOutbound,
+      metadata: metadata ?? this.metadata,
+    );
+  }
 
-extension CallModelExtensions on CallModel {
   String get formattedDuration {
     final now = DateTime.now();
     final start = answeredTime ?? startTime;
@@ -68,14 +91,6 @@ extension CallModelExtensions on CallModel {
 
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
-
-  bool get canAnswer =>
-      state == CallState.ringing && direction == CallDirection.incoming;
-  bool get canHold => state == CallState.established && !isHeld;
-  bool get canResume => state == CallState.established && isHeld;
-  bool get canTransfer => state == CallState.established;
-  bool get canSendDTMF => state == CallState.established;
-  bool get canHangup => state != CallState.ended && state != CallState.failed;
 
   String get statusText {
     switch (state) {
@@ -89,10 +104,60 @@ extension CallModelExtensions on CallModel {
         return 'Finalizada';
       case CallState.failed:
         return 'Falhou';
-      case CallState.terminated:
-        return 'Terminada';
       default:
         return 'Desconhecido';
     }
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'destination': destination,
+      'direction': direction.name,
+      'state': state.name,
+      'startTime': startTime.toIso8601String(),
+      'isHeld': isHeld,
+      'isConference': isConference,
+      'isMuted': isMuted,
+      'isActive': isActive,
+      'displayName': displayName,
+      'answeredTime': answeredTime?.toIso8601String(),
+      'endTime': endTime?.toIso8601String(),
+      'participants': participants,
+      'transferTarget': transferTarget,
+      'isOutbound': isOutbound,
+      'metadata': metadata,
+    };
+  }
+
+  factory CallModel.fromJson(Map<String, dynamic> json) {
+    return CallModel(
+      id: json['id'] as String,
+      destination: json['destination'] as String,
+      direction: CallDirection.values.firstWhere(
+        (e) => e.name == json['direction'],
+        orElse: () => CallDirection.outgoing,
+      ),
+      state: CallState.values.firstWhere(
+        (e) => e.name == json['state'],
+        orElse: () => CallState.ended,
+      ),
+      startTime: DateTime.parse(json['startTime'] as String),
+      isHeld: json['isHeld'] as bool? ?? false,
+      isConference: json['isConference'] as bool? ?? false,
+      isMuted: json['isMuted'] as bool? ?? false,
+      isActive: json['isActive'] as bool? ?? false,
+      displayName: json['displayName'] as String?,
+      answeredTime: json['answeredTime'] != null
+          ? DateTime.parse(json['answeredTime'] as String)
+          : null,
+      endTime: json['endTime'] != null
+          ? DateTime.parse(json['endTime'] as String)
+          : null,
+      participants: List<String>.from(json['participants'] ?? []),
+      transferTarget: json['transferTarget'] as String?,
+      isOutbound: json['isOutbound'] as bool? ?? false,
+      metadata: Map<String, dynamic>.from(json['metadata'] ?? {}),
+    );
   }
 }

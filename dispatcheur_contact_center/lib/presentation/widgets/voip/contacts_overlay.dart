@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:ui';
 
-import '../../../data/models/contact_model.dart';
-import '../../providers/contacts_provider.dart';
 import '../common/glass_container.dart';
+import '../common/custom_icon.dart';
 
 class ContactsOverlay extends ConsumerStatefulWidget {
   const ContactsOverlay({
@@ -27,15 +27,53 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
+
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  // Mock contacts baseado no React original
+  final List<Map<String, dynamic>> _contacts = [
+    {
+      'id': '1',
+      'name': 'João Silva',
+      'avatar': 'JS',
+      'mobile': '+351912345678',
+      'landline': '+351212345678',
+      'email': 'joao@example.com',
+      'personal': false,
+    },
+    {
+      'id': '2',
+      'name': 'Maria Santos',
+      'avatar': 'MS',
+      'mobile': '+351987654321',
+      'landline': null,
+      'email': 'maria@example.com',
+      'personal': true,
+    },
+    {
+      'id': '3',
+      'name': 'Pedro Costa',
+      'avatar': 'PC',
+      'mobile': '+351555123456',
+      'landline': '+351555123457',
+      'email': 'pedro@example.com',
+      'personal': false,
+    },
+  ];
 
   @override
   void initState() {
     super.initState();
+    _initializeAnimation();
+  }
+
+  void _initializeAnimation() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(1.0, 0.0),
       end: Offset.zero,
@@ -62,15 +100,28 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
   @override
   void dispose() {
     _animationController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filteredContacts {
+    if (_searchQuery.isEmpty) return _contacts;
+
+    return _contacts.where((contact) {
+      final name = contact['name'].toString().toLowerCase();
+      final mobile = contact['mobile']?.toString() ?? '';
+      final landline = contact['landline']?.toString() ?? '';
+      final query = _searchQuery.toLowerCase();
+
+      return name.contains(query) ||
+          mobile.contains(query) ||
+          landline.contains(query);
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     if (!widget.isOpen) return const SizedBox();
-
-    final contactsState = ref.watch(contactsProvider);
-    final filteredContacts = _filterContacts(contactsState.contacts);
 
     return Positioned.fill(
       child: GestureDetector(
@@ -82,7 +133,7 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
             child: Align(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: () {}, // Prevent closing when tapping inside
+                onTap: () {},
                 child: Container(
                   width: widget.isMobile
                       ? MediaQuery.of(context).size.width * 0.9
@@ -93,14 +144,44 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
                     bottom: widget.isMobile ? 50 : 80,
                     right: widget.isMobile ? 20 : 80,
                   ),
-                  child: GlassContainer(
-                    borderRadius: 16,
-                    child: Column(
-                      children: [
-                        _buildHeader(),
-                        _buildSearchBar(),
-                        Expanded(child: _buildContactsList(filteredContacts)),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0x2659B2F6), // rgba(59, 130, 246, 0.15)
+                          Color(0x1A93C5FD), // rgba(147, 197, 253, 0.1)
+                          Color(0x0DDBEAFE), // rgba(219, 234, 254, 0.05)
+                        ],
+                      ),
+                      border: Border.all(
+                        color:
+                            const Color(0x663B82F6), // rgba(59, 130, 246, 0.4)
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                              0x4D3B82F6), // rgba(59, 130, 246, 0.3)
+                          blurRadius: 30,
+                          offset: const Offset(0, 10),
+                        ),
                       ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                        child: Column(
+                          children: [
+                            _buildHeader(),
+                            _buildSearchSection(),
+                            Expanded(child: _buildContactsList()),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -114,10 +195,10 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(widget.isMobile ? 12 : 16),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+          colors: [Color(0xFF1e3a8a), Color(0xFF3b82f6)],
         ),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(16),
@@ -128,11 +209,11 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
         children: [
           const Icon(Icons.contacts, color: Colors.white),
           const SizedBox(width: 8),
-          const Text(
-            'Contactos',
+          Text(
+            'Contacts',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: widget.isMobile ? 16 : 18,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -146,31 +227,77 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
     );
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
+  Widget _buildSearchSection() {
+    return Container(
+      padding: EdgeInsets.all(widget.isMobile ? 12 : 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0x1A3B82F6)),
+        ),
+      ),
       child: TextField(
-        decoration: const InputDecoration(
-          hintText: 'Pesquisar contactos...',
-          prefixIcon: Icon(Icons.search),
-          border: OutlineInputBorder(),
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Rechercher des contacts...',
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF3b82f6)),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0x663B82F6)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF3b82f6)),
+          ),
+          filled: true,
+          fillColor: const Color(0x263B82F6), // rgba(59, 130, 246, 0.15)
         ),
         onChanged: (value) => setState(() => _searchQuery = value),
       ),
     );
   }
 
-  Widget _buildContactsList(List<ContactModel> contacts) {
-    if (contacts.isEmpty) {
-      return const Center(
+  Widget _buildContactsList() {
+    final filteredContacts = _filteredContacts;
+
+    if (filteredContacts.isEmpty) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(
+              Icons.person_search,
+              size: widget.isMobile ? 48 : 64,
+              color: Colors.grey.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
             Text(
-              'Nenhum contacto encontrado',
-              style: TextStyle(color: Colors.grey),
+              _searchQuery.isNotEmpty
+                  ? 'Aucun contact trouvé'
+                  : 'Aucun contact disponible',
+              style: TextStyle(
+                fontSize: widget.isMobile ? 16 : 18,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1e3a8a),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _searchQuery.isNotEmpty
+                  ? 'Essayez une recherche différente'
+                  : 'Ajoutez des contacts pour les voir ici',
+              style: TextStyle(
+                fontSize: widget.isMobile ? 12 : 14,
+                color: Colors.grey,
+              ),
             ),
           ],
         ),
@@ -178,48 +305,131 @@ class _ContactsOverlayState extends ConsumerState<ContactsOverlay>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: contacts.length,
+      padding: EdgeInsets.all(widget.isMobile ? 12 : 16),
+      itemCount: filteredContacts.length,
       itemBuilder: (context, index) {
-        final contact = contacts[index];
+        final contact = filteredContacts[index];
         return _buildContactItem(contact);
       },
     );
   }
 
-  Widget _buildContactItem(ContactModel contact) {
+  Widget _buildContactItem(Map<String, dynamic> contact) {
+    final hasNumber = contact['mobile'] != null || contact['landline'] != null;
+    final primaryNumber = contact['mobile'] ?? contact['landline'] ?? '';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      color: hasNumber
+          ? const Color(0x1A3B82F6) // rgba(59, 130, 246, 0.1)
+          : const Color(0x1A64748B), // rgba(100, 116, 139, 0.1)
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFF3B82F6),
+          backgroundColor:
+              hasNumber ? const Color(0xFF3b82f6) : const Color(0xFF64748b),
           child: Text(
-            contact.initials,
-            style: const TextStyle(color: Colors.white),
+            contact['avatar'],
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        title: Text(contact.displayName),
-        subtitle: Text(contact.primaryPhone),
-        trailing: contact.hasPhoneNumber
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                contact['name'],
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: hasNumber
+                      ? const Color(0xFF1e3a8a)
+                      : const Color(0xFF6b7280),
+                  fontSize: widget.isMobile ? 14 : 16,
+                ),
+              ),
+            ),
+            if (contact['personal'] == true)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFf59e0b),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Personnel',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: widget.isMobile ? 8 : 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (contact['mobile'] != null)
+              Row(
+                children: [
+                  Icon(
+                    Icons.phone_android,
+                    size: widget.isMobile ? 12 : 14,
+                    color: const Color(0xFF64748b),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    contact['mobile'],
+                    style: TextStyle(
+                      fontSize: widget.isMobile ? 11 : 12,
+                      color: const Color(0xFF64748b),
+                    ),
+                  ),
+                ],
+              ),
+            if (contact['landline'] != null)
+              Row(
+                children: [
+                  Icon(
+                    Icons.phone,
+                    size: widget.isMobile ? 12 : 14,
+                    color: const Color(0xFF64748b),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    contact['landline'],
+                    style: TextStyle(
+                      fontSize: widget.isMobile ? 11 : 12,
+                      color: const Color(0xFF64748b),
+                    ),
+                  ),
+                ],
+              ),
+            if (!hasNumber)
+              const Text(
+                'Aucun numéro',
+                style: TextStyle(
+                  color: Color(0xFF9ca3af),
+                  fontSize: 12,
+                ),
+              ),
+          ],
+        ),
+        trailing: hasNumber
             ? IconButton(
-                icon: const Icon(Icons.call, color: Colors.green),
-                onPressed: () => widget.onCallContact(contact.primaryPhone),
+                icon: const Icon(
+                  Icons.call,
+                  color: Color(0xFF22c55e),
+                ),
+                onPressed: () => widget.onCallContact(primaryNumber),
               )
-            : const Icon(Icons.call_end, color: Colors.grey),
-        onTap: contact.hasPhoneNumber
-            ? () => widget.onCallContact(contact.primaryPhone)
-            : null,
+            : Icon(
+                Icons.phone_disabled,
+                color: Colors.grey.withOpacity(0.5),
+              ),
+        onTap: hasNumber ? () => widget.onCallContact(primaryNumber) : null,
       ),
     );
-  }
-
-  List<ContactModel> _filterContacts(List<ContactModel> contacts) {
-    if (_searchQuery.isEmpty) return contacts;
-
-    return contacts.where((contact) {
-      return contact.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (contact.mobile?.contains(_searchQuery) ?? false) ||
-          (contact.landline?.contains(_searchQuery) ?? false);
-    }).toList();
   }
 }
