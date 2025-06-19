@@ -17,6 +17,18 @@ class OnlineUsersState with _$OnlineUsersState {
   }) = _OnlineUsersState;
 }
 
+// ✅ EXTENSION PARA ADICIONAR totalActive
+extension OnlineUsersStateExtension on OnlineUsersState {
+  int get totalActive => users.where((user) => user.isActive).length;
+
+  int get onlineCount =>
+      users.where((user) => user.status == UserStatus.online).length;
+  int get awayCount =>
+      users.where((user) => user.status == UserStatus.away).length;
+  int get busyCount =>
+      users.where((user) => user.status == UserStatus.busy).length;
+}
+
 class OnlineUsersNotifier extends StateNotifier<OnlineUsersState> {
   OnlineUsersNotifier(this._apiService) : super(const OnlineUsersState()) {
     _startPolling();
@@ -53,11 +65,6 @@ class OnlineUsersNotifier extends StateNotifier<OnlineUsersState> {
   List<UserModel> getUsersByStatus(UserStatus status) {
     return state.users.where((user) => user.status == status).toList();
   }
-
-  int get onlineCount => getUsersByStatus(UserStatus.online).length;
-  int get awayCount => getUsersByStatus(UserStatus.away).length;
-  int get busyCount => getUsersByStatus(UserStatus.busy).length;
-  int get totalActive => onlineCount + awayCount + busyCount;
 
   @override
   void dispose() {

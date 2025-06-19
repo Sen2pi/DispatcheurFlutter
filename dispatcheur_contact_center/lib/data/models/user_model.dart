@@ -1,30 +1,27 @@
-import 'dart:ui';
-
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:flutter/material.dart';
 
 part 'user_model.freezed.dart';
 part 'user_model.g.dart';
 
 @freezed
-@HiveType(typeId: 6)
 class UserModel with _$UserModel {
   const factory UserModel({
-    @HiveField(0) required String id,
-    @HiveField(1) required String name,
-    @HiveField(2) required String email,
-    @HiveField(3) String? avatar,
-    @HiveField(4) String? company,
-    @HiveField(5) String? department,
-    @HiveField(6) String? phone,
-    @HiveField(7) @Default(UserRole.user) UserRole role,
-    @HiveField(8) @Default(UserStatus.offline) UserStatus status,
-    @HiveField(9) DateTime? lastSeen,
-    @HiveField(10) @Default(false) bool isOnline,
-    @HiveField(11) Map<String, dynamic>? preferences,
-    @HiveField(12) VoipCredentials? voipCredentials,
-    @HiveField(13) DateTime? createdAt,
-    @HiveField(14) DateTime? updatedAt,
+    required String id,
+    required String name,
+    required String email,
+    String? avatar,
+    String? company,
+    String? department,
+    String? phone,
+    @Default(UserRole.user) UserRole role,
+    @Default(UserStatus.offline) UserStatus status,
+    DateTime? lastSeen,
+    @Default(false) bool isOnline,
+    Map<String, dynamic>? preferences,
+    VoipCredentials? voipCredentials,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>
@@ -32,46 +29,36 @@ class UserModel with _$UserModel {
 }
 
 @freezed
-@HiveType(typeId: 7)
 class VoipCredentials with _$VoipCredentials {
   const factory VoipCredentials({
-    @HiveField(0) required String server,
-    @HiveField(1) required String username,
-    @HiveField(2) required String password,
-    @HiveField(3) required String displayName,
-    @HiveField(4) @Default(5060) int port,
-    @HiveField(5) @Default(false) bool secure,
-    @HiveField(6) String? domain,
+    required String server,
+    required String username,
+    required String password,
+    required String displayName,
+    @Default(5060) int port,
+    @Default(false) bool secure,
+    String? domain,
   }) = _VoipCredentials;
 
   factory VoipCredentials.fromJson(Map<String, dynamic> json) =>
       _$VoipCredentialsFromJson(json);
 }
 
-@HiveType(typeId: 8)
 enum UserRole {
-  @HiveField(0)
   admin,
-  @HiveField(1)
   manager,
-  @HiveField(2)
   user,
-  @HiveField(3)
   guest,
 }
 
-@HiveType(typeId: 9)
 enum UserStatus {
-  @HiveField(0)
   online,
-  @HiveField(1)
   away,
-  @HiveField(2)
   busy,
-  @HiveField(3)
   offline,
 }
 
+// ✅ EXTENSIONS NECESSÁRIAS
 extension UserModelExtensions on UserModel {
   String get initials {
     final words = name.split(' ');

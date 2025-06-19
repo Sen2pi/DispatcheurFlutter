@@ -18,7 +18,8 @@ class AppTheme {
           fontWeight: FontWeight.bold,
         ),
       ),
-      cardTheme: CardTheme(
+      // ✅ CORRIGIDO: CardTheme -> CardThemeData
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: Colors.white.withOpacity(0.8),
@@ -108,7 +109,8 @@ class AppTheme {
           fontWeight: FontWeight.bold,
         ),
       ),
-      cardTheme: CardTheme(
+      // ✅ CORRIGIDO: CardTheme -> CardThemeData
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: const Color(0xFF1E293B).withOpacity(0.8),
@@ -190,8 +192,6 @@ class AppTheme {
     onSecondary: Color(0xFFFFFFFF),
     error: Color(0xFFEF4444),
     onError: Color(0xFFFFFFFF),
-    background: Color(0xFFF8FAFC),
-    onBackground: Color(0xFF1E293B),
     surface: Color(0xFFFFFFFF),
     onSurface: Color(0xFF1E293B),
   );
@@ -204,8 +204,6 @@ class AppTheme {
     onSecondary: Color(0xFFFFFFFF),
     error: Color(0xFFEF4444),
     onError: Color(0xFFFFFFFF),
-    background: Color(0xFF0F172A),
-    onBackground: Color(0xFF93C5FD),
     surface: Color(0xFF1E293B),
     onSurface: Color(0xFF93C5FD),
   );

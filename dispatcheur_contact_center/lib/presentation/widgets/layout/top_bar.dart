@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/online_users_provider.dart';
-import '../common/glass_container.dart';
+import '../../data/models/user_model.dart'; // ✅ IMPORT ADICIONADO
 
 class TopBar extends ConsumerWidget implements PreferredSizeWidget {
   const TopBar({super.key});
@@ -79,7 +79,7 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${onlineUsersState.totalActive} online',
+                  '${onlineUsersState.totalActive} online', // ✅ CORRIGIDO
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -96,7 +96,6 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
         IconButton(
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
           onPressed: () {
-            // TODO: Implementar notificações
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Notificações em desenvolvimento')),
             );
@@ -105,7 +104,8 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
 
         // Menu do perfil
         if (user != null)
-          PopupMenuButton(
+          PopupMenuButton<String>(
+            // ✅ CORRIGIDO: Adicionado tipo <String>
             offset: const Offset(0, 50),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -187,10 +187,12 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                 ],
               ),
             ),
+            // ✅ CORRIGIDO: itemBuilder retorna PopupMenuEntry<String>
             itemBuilder: (context) => [
               // Informações do perfil
-              PopupMenuItem(
+              PopupMenuItem<String>(
                 enabled: false,
+                value: 'info',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -224,7 +226,8 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
               ),
 
               // Mudar status
-              PopupMenuItem(
+              PopupMenuItem<String>(
+                value: 'status',
                 child: const Row(
                   children: [
                     Icon(Icons.circle),
@@ -232,11 +235,11 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                     Text('Mudar Estado'),
                   ],
                 ),
-                onTap: () => _showStatusDialog(context, ref, user),
               ),
 
               // Perfil
-              PopupMenuItem(
+              PopupMenuItem<String>(
+                value: 'profile',
                 child: const Row(
                   children: [
                     Icon(Icons.person),
@@ -244,16 +247,11 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                     Text('Perfil'),
                   ],
                 ),
-                onTap: () {
-                  // TODO: Implementar perfil
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Perfil em desenvolvimento')),
-                  );
-                },
               ),
 
               // Configurações
-              PopupMenuItem(
+              PopupMenuItem<String>(
+                value: 'settings',
                 child: const Row(
                   children: [
                     Icon(Icons.settings),
@@ -261,19 +259,13 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                     Text('Configurações'),
                   ],
                 ),
-                onTap: () {
-                  // TODO: Implementar configurações
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Configurações em desenvolvimento')),
-                  );
-                },
               ),
 
               const PopupMenuDivider(),
 
               // Logout
-              PopupMenuItem(
+              PopupMenuItem<String>(
+                value: 'logout',
                 child: const Row(
                   children: [
                     Icon(Icons.logout, color: Colors.red),
@@ -281,9 +273,29 @@ class TopBar extends ConsumerWidget implements PreferredSizeWidget {
                     Text('Sair', style: TextStyle(color: Colors.red)),
                   ],
                 ),
-                onTap: () => _showLogoutDialog(context, ref),
               ),
             ],
+            onSelected: (value) {
+              switch (value) {
+                case 'status':
+                  _showStatusDialog(context, ref, user);
+                  break;
+                case 'profile':
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Perfil em desenvolvimento')),
+                  );
+                  break;
+                case 'settings':
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Configurações em desenvolvimento')),
+                  );
+                  break;
+                case 'logout':
+                  _showLogoutDialog(context, ref);
+                  break;
+              }
+            },
           ),
 
         const SizedBox(width: 16),
