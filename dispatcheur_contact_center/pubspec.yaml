@@ -1,0 +1,88 @@
+name: dispatcheur_cc
+description: Sistema VoIP multi-plataforma DispatcheurCC
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # State Management
+  flutter_riverpod: ^2.4.9
+  
+  # VoIP & WebRTC
+  flutter_webrtc: ^0.9.46
+  sip_ua: ^0.5.11
+  
+  # HTTP & API
+  dio: ^5.3.2
+  retrofit: ^4.0.3
+  json_serializable: ^6.7.1
+  json_annotation: ^4.8.1
+  
+  # Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  shared_preferences: ^2.2.2
+  
+  # UI & Navigation
+  go_router: ^12.1.1
+  auto_route: ^7.8.4
+  
+  # Permissions & Device
+  permission_handler: ^11.0.1
+  device_info_plus: ^9.1.0
+  
+  # Audio & Media
+  just_audio: ^0.9.35
+  audio_session: ^0.1.16
+  
+  # Notifications
+  flutter_local_notifications: ^16.2.0
+  awesome_notifications: ^0.8.2
+  
+  # Environment & Config
+  flutter_dotenv: ^5.1.0
+  
+  # Utils
+  logger: ^2.0.2+1
+  uuid: ^4.1.0
+  intl: ^0.18.1
+  
+  # Freezed for models
+  freezed_annotation: ^2.4.1
+  
+  # Dependency Injection
+  get_it: ^7.6.4
+  injectable: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  
+  # Code generation
+  build_runner: ^2.4.7
+  freezed: ^2.4.6
+  retrofit_generator: ^8.0.4
+  injectable_generator: ^2.4.1
+  hive_generator: ^2.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
+    - assets/sounds/
+    - assets/fonts/
+  
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
