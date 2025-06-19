@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../services/voip_engine.dart';
 import '../../data/models/call_model.dart';
@@ -21,6 +22,8 @@ class VoipState with _$VoipState {
     String? selectedSpeaker,
     @Default([]) List<MediaDeviceInfo> availableMicrophones,
     @Default([]) List<MediaDeviceInfo> availableSpeakers,
+    String? activeCallId,
+    @Default(10) int maxConcurrentCalls,
   }) = _VoipState;
 }
 
@@ -53,10 +56,15 @@ class VoipNotifier extends StateNotifier<VoipState> {
 
   Future<void> initialize() async {
     try {
+      state = state.copyWith(isConnecting: true, error: null);
       await _voipEngine.initialize();
       await _updateAudioDevices();
+      state = state.copyWith(isConnecting: false);
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(
+        error: e.toString(),
+        isConnecting: false,
+      );
     }
   }
 
@@ -82,7 +90,10 @@ class VoipNotifier extends StateNotifier<VoipState> {
 
       state = state.copyWith(isConnecting: false);
     } catch (e) {
-      state = state.copyWith(isConnecting: false, error: e.toString());
+      state = state.copyWith(
+        isConnecting: false,
+        error: e.toString(),
+      );
       rethrow;
     }
   }
@@ -104,6 +115,11 @@ class VoipNotifier extends StateNotifier<VoipState> {
 
   Future<String> makeCall(String destination) async {
     try {
+      if (state.activeCalls.length >= state.maxConcurrentCalls) {
+        throw VoipException(
+            'Limite máximo de ${state.maxConcurrentCalls} chamadas atingido');
+      }
+
       return await _voipEngine.makeCall(destination);
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -185,6 +201,10 @@ class VoipNotifier extends StateNotifier<VoipState> {
     }
   }
 
+  void setActiveCall(String callId) {
+    state = state.copyWith(activeCallId: callId);
+  }
+
   Future<void> _updateAudioDevices() async {
     try {
       state = state.copyWith(
@@ -194,7 +214,6 @@ class VoipNotifier extends StateNotifier<VoipState> {
         selectedSpeaker: _voipEngine.selectedSpeaker,
       );
     } catch (e) {
-      // Log do erro sem afetar o estado principal
       print('Erro ao atualizar dispositivos de áudio: $e');
     }
   }

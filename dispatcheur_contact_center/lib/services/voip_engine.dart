@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:dart_sip_ua/dart_sip_ua.dart';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models/call_model.dart';
 import '../core/constants/voip_constants.dart';
@@ -18,12 +18,8 @@ class VoipEngine {
   final Logger _logger = Logger();
   final Uuid _uuid = const Uuid();
 
-  UA? _userAgent;
-  UaSettings? _settings;
-
   // State Management
   final Map<String, CallModel> _activeCalls = {};
-  final Map<String, Call> _sipCalls = {};
   final StreamController<List<CallModel>> _callsController =
       StreamController<List<CallModel>>.broadcast();
   final StreamController<VoipEngineState> _stateController =
@@ -33,19 +29,9 @@ class VoipEngine {
   bool _isConnected = false;
   String? _currentUser;
 
-  // Audio Management
-  String? _selectedMicrophone;
-  String? _selectedSpeaker;
-  List<MediaDeviceInfo> _audioInputs = [];
-  List<MediaDeviceInfo> _audioOutputs = [];
-
-  // Auto-reconnection
-  Timer? _reconnectTimer;
-  int _reconnectAttempts = 0;
-  final int _maxReconnectAttempts = 5;
-
-  // Conference Management
-  final Map<String, List<String>> _conferences = {};
+  // Mock WebRTC para demonstração (substituir por implementação real)
+  RTCPeerConnection? _peerConnection;
+  MediaStream? _localStream;
 
   // Stream getters
   Stream<List<CallModel>> get callsStream => _callsController.stream;
@@ -59,13 +45,7 @@ class VoipEngine {
   Future<void> initialize() async {
     try {
       _logger.i('Inicializando VoIP Engine...');
-
-      // Inicializar WebRTC
       await _initializeWebRTC();
-
-      // Enumerar dispositivos de áudio
-      await _enumerateAudioDevices();
-
       _logger.i('VoIP Engine inicializado com sucesso');
     } catch (e) {
       _logger.e('Erro na inicialização do VoIP Engine: $e');
@@ -73,22 +53,15 @@ class VoipEngine {
     }
   }
 
-  /// Inicializa WebRTC
   Future<void> _initializeWebRTC() async {
     try {
-      // Testar acesso aos dispositivos
-      final stream = await navigator.mediaDevices.getUserMedia({
-        'audio': {
-          'echoCancellation': true,
-          'noiseSuppression': true,
-          'autoGainControl': true,
-        },
-        'video': false,
-      });
+      final configuration = <String, dynamic>{
+        'iceServers': [
+          {'urls': 'stun:stun.l.google.com:19302'},
+        ]
+      };
 
-      // Parar o stream de teste
-      stream.getTracks().forEach((track) => track.stop());
-
+      _peerConnection = await createPeerConnection(configuration);
       _logger.d('WebRTC inicializado com sucesso');
     } catch (e) {
       _logger.e('Erro na inicialização WebRTC: $e');
@@ -96,28 +69,7 @@ class VoipEngine {
     }
   }
 
-  /// Enumera dispositivos de áudio disponíveis
-  Future<void> _enumerateAudioDevices() async {
-    try {
-      final devices = await navigator.mediaDevices.enumerateDevices();
-
-      _audioInputs = devices
-          .where((device) => device.kind == 'audioinput')
-          .toList();
-
-      _audioOutputs = devices
-          .where((device) => device.kind == 'audiooutput')
-          .toList();
-
-      _logger.d(
-        'Dispositivos de áudio: ${_audioInputs.length} inputs, ${_audioOutputs.length} outputs',
-      );
-    } catch (e) {
-      _logger.w('Erro ao enumerar dispositivos: $e');
-    }
-  }
-
-  /// Conecta ao servidor SIP
+  /// Conecta ao servidor SIP (Mock para demonstração)
   Future<bool> connect({
     required String server,
     required String username,
@@ -129,40 +81,24 @@ class VoipEngine {
     try {
       _logger.i('Conectando ao servidor SIP: $server:$port');
 
-      // Configurar settings
-      _settings = UaSettings();
-      _settings!.uri = 'sip:$username@$server';
-      _settings!.authorizationUser = username;
-      _settings!.password = password;
-      _settings!.displayName = displayName;
-      _settings!.userAgent = VoipConstants.defaultUserAgent;
-      _settings!.transportOptions = TransportOptions(
-        wsServers: ['${secure ? 'wss' : 'ws'}://$server:$port/ws'],
-      );
+      // Simular conexão
+      await Future.delayed(const Duration(seconds: 2));
 
-      // Configurar WebRTC
-      _settings!.mediaConstraints = {
-        'audio': {
-          'mandatory': {
-            'echoCancellation': true,
-            'noiseSuppression': true,
-            'autoGainControl': true,
-          },
-        },
-        'video': false,
-      };
-
-      // Criar User Agent
-      _userAgent = UA(_settings!);
-
-      // Configurar listeners
-      _setupUserAgentListeners();
-
-      // Iniciar
-      _userAgent!.start();
       _currentUser = username;
+      _isConnected = true;
+      _isRegistered = true;
 
-      _updateState(VoipEngineState.connecting);
+      _updateState(VoipEngineState.connected);
+
+      // Salvar credenciais
+      await _saveCredentials({
+        'server': server,
+        'username': username,
+        'password': password,
+        'displayName': displayName,
+        'port': port,
+        'secure': secure,
+      });
 
       return true;
     } catch (e) {
@@ -172,147 +108,7 @@ class VoipEngine {
     }
   }
 
-  /// Configura os listeners do User Agent
-  void _setupUserAgentListeners() {
-    if (_userAgent == null) return;
-
-    // Listener de conexão
-    _userAgent!.on(EventSocketConnecting(), (EventSocketConnecting data) {
-      _logger.d('Conectando...');
-      _updateState(VoipEngineState.connecting);
-    });
-
-    _userAgent!.on(EventSocketConnected(), (EventSocketConnected data) {
-      _logger.i('Socket conectado');
-      _isConnected = true;
-      _updateState(VoipEngineState.connected);
-    });
-
-    _userAgent!.on(EventSocketDisconnected(), (EventSocketDisconnected data) {
-      _logger.w('Socket desconectado');
-      _isConnected = false;
-      _isRegistered = false;
-      _updateState(VoipEngineState.disconnected);
-      _handleReconnection();
-    });
-
-    // Listener de registro
-    _userAgent!.on(EventRegistered(), (EventRegistered data) {
-      _logger.i('Registrado com sucesso');
-      _isRegistered = true;
-      _reconnectAttempts = 0; // Reset counter on success
-      _updateState(VoipEngineState.registered);
-    });
-
-    _userAgent!.on(EventUnregister(), (EventUnregister data) {
-      _logger.w('Não registrado');
-      _isRegistered = false;
-      _updateState(VoipEngineState.unregistered);
-    });
-
-    _userAgent!.on(EventRegistrationFailed(), (EventRegistrationFailed data) {
-      _logger.e('Falha no registro: ${data.cause}');
-      _updateState(VoipEngineState.error);
-    });
-
-    // Listener de chamadas recebidas
-    _userAgent!.on(EventCallReceived(), (EventCallReceived data) {
-      _logger.i('Nova chamada recebida de: ${data.originator}');
-      _handleIncomingCall(data.call);
-    });
-
-    // Listener de chamadas finalizadas
-    _userAgent!.on(EventCallEnded(), (EventCallEnded data) {
-      _logger.i('Chamada finalizada: ${data.call.id}');
-      _handleCallEnded(data.call);
-    });
-  }
-
-  /// Manipula reconexão automática
-  void _handleReconnection() {
-    if (_reconnectAttempts >= _maxReconnectAttempts) {
-      _logger.e('Máximo de tentativas de reconexão atingido');
-      return;
-    }
-
-    _reconnectAttempts++;
-    final delay = Duration(seconds: _reconnectAttempts * 2);
-
-    _logger.i(
-      'Tentativa de reconexão ${_reconnectAttempts}/${_maxReconnectAttempts} em ${delay.inSeconds}s',
-    );
-
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(delay, () {
-      if (_userAgent != null && !_isConnected) {
-        _userAgent!.start();
-      }
-    });
-  }
-
-  /// Manipula chamadas recebidas
-  void _handleIncomingCall(Call call) {
-    final callId = _uuid.v4();
-
-    final callModel = CallModel(
-      id: callId,
-      destination: call.remote_identity?.uri.toString() ?? 'Desconhecido',
-      direction: CallDirection.incoming,
-      state: CallState.ringing,
-      startTime: DateTime.now(),
-    );
-
-    _activeCalls[callId] = callModel;
-    _sipCalls[callId] = call;
-
-    // Configurar listeners da chamada
-    _setupCallListeners(call, callId);
-
-    _notifyCallsUpdate();
-  }
-
-  /// Configura listeners para uma chamada específica
-  void _setupCallListeners(Call call, String callId) {
-    call.on(EventCallAccepted(), (EventCallAccepted data) {
-      _updateCallState(callId, CallState.established);
-    });
-
-    call.on(EventCallFailed(), (EventCallFailed data) {
-      _updateCallState(callId, CallState.failed);
-    });
-
-    call.on(EventCallEnded(), (EventCallEnded data) {
-      _updateCallState(callId, CallState.ended);
-      Timer(const Duration(seconds: 2), () {
-        _activeCalls.remove(callId);
-        _sipCalls.remove(callId);
-        _notifyCallsUpdate();
-      });
-    });
-  }
-
-  /// Manipula chamadas finalizadas
-  void _handleCallEnded(Call call) {
-    // Encontrar o callId correspondente
-    String? callId;
-    for (final entry in _sipCalls.entries) {
-      if (entry.value == call) {
-        callId = entry.key;
-        break;
-      }
-    }
-
-    if (callId != null) {
-      _updateCallState(callId, CallState.ended);
-      Timer(const Duration(seconds: 2), () {
-        _activeCalls.remove(callId);
-        _sipCalls.remove(callId);
-        _notifyCallsUpdate();
-      });
-    }
-  }
-
-  /// Faz uma chamada
+  /// Faz uma chamada (Mock)
   Future<String> makeCall(String destination) async {
     if (!_isRegistered) {
       throw VoipException('Não registrado no servidor SIP');
@@ -327,7 +123,6 @@ class VoipEngine {
 
       final callId = _uuid.v4();
 
-      // Criar modelo da chamada
       final callModel = CallModel(
         id: callId,
         destination: destination,
@@ -340,46 +135,31 @@ class VoipEngine {
       _activeCalls[callId] = callModel;
       _notifyCallsUpdate();
 
-      // Configurar opções da chamada
-      final callOptions = CallOptions(
-        mediaConstraints: {
-          'audio': {
-            'mandatory': {
-              'echoCancellation': true,
-              'noiseSuppression': true,
-              'autoGainControl': true,
-            },
-          },
-          'video': false,
-        },
-      );
-
-      // Fazer chamada SIP
-      final call = _userAgent!.call(destination, callOptions);
-      _sipCalls[callId] = call;
-
-      // Configurar listeners
-      _setupCallListeners(call, callId);
-
-      // Atualizar estado
-      _updateCallState(callId, CallState.ringing);
+      // Simular progresso da chamada
+      _simulateCallProgress(callId);
 
       _logger.i('Chamada iniciada com ID: $callId');
       return callId;
     } catch (e) {
       _logger.e('Erro ao fazer chamada: $e');
-      _activeCalls.remove(callId);
-      _notifyCallsUpdate();
       throw VoipException('Erro na chamada: $e');
     }
+  }
+
+  /// Simular progresso da chamada para demonstração
+  Future<void> _simulateCallProgress(String callId) async {
+    await Future.delayed(const Duration(seconds: 1));
+    _updateCallState(callId, CallState.ringing);
+
+    await Future.delayed(const Duration(seconds: 3));
+    _updateCallState(callId, CallState.established);
   }
 
   /// Atende uma chamada
   Future<void> answerCall(String callId) async {
     final call = _activeCalls[callId];
-    final sipCall = _sipCalls[callId];
 
-    if (call == null || sipCall == null) {
+    if (call == null) {
       throw VoipException('Chamada não encontrada: $callId');
     }
 
@@ -390,9 +170,6 @@ class VoipEngine {
     try {
       _logger.i('Atendendo chamada: $callId');
 
-      sipCall.answer();
-
-      // Atualizar modelo
       final updatedCall = call.copyWith(
         state: CallState.established,
         answeredTime: DateTime.now(),
@@ -411,7 +188,6 @@ class VoipEngine {
   /// Finaliza uma chamada
   Future<void> hangupCall(String callId) async {
     final call = _activeCalls[callId];
-    final sipCall = _sipCalls[callId];
 
     if (call == null) {
       _logger.w('Tentativa de desligar chamada inexistente: $callId');
@@ -421,12 +197,6 @@ class VoipEngine {
     try {
       _logger.i('Finalizando chamada: $callId');
 
-      // Finalizar chamada SIP
-      if (sipCall != null) {
-        sipCall.hangup();
-      }
-
-      // Atualizar modelo
       final updatedCall = call.copyWith(
         state: CallState.ended,
         endTime: DateTime.now(),
@@ -437,7 +207,6 @@ class VoipEngine {
       // Remover após um delay
       Timer(const Duration(seconds: 2), () {
         _activeCalls.remove(callId);
-        _sipCalls.remove(callId);
         _notifyCallsUpdate();
       });
 
@@ -446,9 +215,7 @@ class VoipEngine {
       _logger.i('Chamada finalizada: $callId');
     } catch (e) {
       _logger.e('Erro ao finalizar chamada: $e');
-      // Remover mesmo com erro
       _activeCalls.remove(callId);
-      _sipCalls.remove(callId);
       _notifyCallsUpdate();
     }
   }
@@ -456,39 +223,28 @@ class VoipEngine {
   /// Coloca chamada em espera/retoma
   Future<void> holdCall(String callId, bool hold) async {
     final call = _activeCalls[callId];
-    final sipCall = _sipCalls[callId];
 
-    if (call == null || sipCall == null) {
+    if (call == null) {
       throw VoipException('Chamada não encontrada: $callId');
     }
 
     if (call.state != CallState.established) {
       throw VoipException(
-        'Apenas chamadas estabelecidas podem ser colocadas em espera',
-      );
+          'Apenas chamadas estabelecidas podem ser colocadas em espera');
     }
 
     try {
-      _logger.i(
-        '${hold ? 'Colocando em espera' : 'Retomando'} chamada: $callId',
-      );
+      _logger
+          .i('${hold ? 'Colocando em espera' : 'Retomando'} chamada: $callId');
 
-      if (hold) {
-        sipCall.hold();
-      } else {
-        sipCall.unhold();
-      }
-
-      // Atualizar modelo
       final updatedCall = call.copyWith(isHeld: hold);
       _activeCalls[callId] = updatedCall;
       _notifyCallsUpdate();
 
       _logger.i('Chamada ${hold ? 'em espera' : 'retomada'}: $callId');
     } catch (e) {
-      _logger.e(
-        'Erro ao ${hold ? 'colocar em espera' : 'retomar'} chamada: $e',
-      );
+      _logger
+          .e('Erro ao ${hold ? 'colocar em espera' : 'retomar'} chamada: $e');
       throw VoipException('Erro na operação: $e');
     }
   }
@@ -496,24 +252,19 @@ class VoipEngine {
   /// Transfere uma chamada
   Future<void> transferCall(String callId, String destination) async {
     final call = _activeCalls[callId];
-    final sipCall = _sipCalls[callId];
 
-    if (call == null || sipCall == null) {
+    if (call == null) {
       throw VoipException('Chamada não encontrada: $callId');
     }
 
     if (call.state != CallState.established) {
       throw VoipException(
-        'Apenas chamadas estabelecidas podem ser transferidas',
-      );
+          'Apenas chamadas estabelecidas podem ser transferidas');
     }
 
     try {
       _logger.i('Transferindo chamada $callId para: $destination');
 
-      sipCall.refer(destination);
-
-      // Atualizar modelo
       final updatedCall = call.copyWith(
         transferTarget: destination,
         state: CallState.ended,
@@ -522,10 +273,8 @@ class VoipEngine {
 
       _activeCalls[callId] = updatedCall;
 
-      // Remover após delay
       Timer(const Duration(seconds: 2), () {
         _activeCalls.remove(callId);
-        _sipCalls.remove(callId);
         _notifyCallsUpdate();
       });
 
@@ -541,9 +290,8 @@ class VoipEngine {
   /// Envia DTMF
   Future<void> sendDTMF(String callId, String digits) async {
     final call = _activeCalls[callId];
-    final sipCall = _sipCalls[callId];
 
-    if (call == null || sipCall == null) {
+    if (call == null) {
       throw VoipException('Chamada não encontrada: $callId');
     }
 
@@ -556,8 +304,7 @@ class VoipEngine {
 
       for (final digit in digits.split('')) {
         if (VoipConstants.dtmfDigits.contains(digit)) {
-          sipCall.sendDTMF(digit);
-          // Pequeno delay entre dígitos
+          // Simular envio DTMF
           await Future.delayed(VoipConstants.dtmfToneDuration);
         }
       }
@@ -569,30 +316,117 @@ class VoipEngine {
     }
   }
 
+  /// Merge de chamadas para conferência
+  Future<void> mergeCalls(String callId1, String callId2) async {
+    final call1 = _activeCalls[callId1];
+    final call2 = _activeCalls[callId2];
+
+    if (call1 == null || call2 == null) {
+      throw VoipException('Uma ou ambas as chamadas não foram encontradas');
+    }
+
+    if (call1.state != CallState.established ||
+        call2.state != CallState.established) {
+      throw VoipException('Ambas as chamadas devem estar estabelecidas');
+    }
+
+    try {
+      _logger.i('Criando conferência entre $callId1 e $callId2');
+
+      final conferenceId = _uuid.v4();
+
+      final updatedCall1 = call1.copyWith(
+        isConference: true,
+        participants: [callId2],
+      );
+
+      final updatedCall2 = call2.copyWith(
+        isConference: true,
+        participants: [callId1],
+      );
+
+      _activeCalls[callId1] = updatedCall1;
+      _activeCalls[callId2] = updatedCall2;
+
+      _notifyCallsUpdate();
+
+      _logger.i('Conferência criada: $conferenceId');
+    } catch (e) {
+      _logger.e('Erro ao criar conferência: $e');
+      throw VoipException('Erro na conferência: $e');
+    }
+  }
+
+  /// Simular chamada recebida (para testes)
+  Future<void> simulateIncomingCall(String fromNumber) async {
+    final callId = _uuid.v4();
+
+    final callModel = CallModel(
+      id: callId,
+      destination: fromNumber,
+      direction: CallDirection.incoming,
+      state: CallState.ringing,
+      startTime: DateTime.now(),
+      displayName: 'Contato $fromNumber',
+    );
+
+    _activeCalls[callId] = callModel;
+    _notifyCallsUpdate();
+
+    _logger.i('Chamada recebida simulada: $callId de $fromNumber');
+  }
+
+  /// Verificar se tem credenciais salvas
+  Future<bool> hasVoipCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final credentials = prefs.getString('voip_credentials');
+      return credentials != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Salvar credenciais
+  Future<void> _saveCredentials(Map<String, dynamic> credentials) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('voip_credentials', json.encode(credentials));
+    } catch (e) {
+      _logger.e('Erro ao salvar credenciais: $e');
+    }
+  }
+
+  /// Carregar credenciais salvas
+  Future<Map<String, dynamic>?> _loadCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final credentialsJson = prefs.getString('voip_credentials');
+
+      if (credentialsJson != null) {
+        return json.decode(credentialsJson) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      _logger.e('Erro ao carregar credenciais: $e');
+      return null;
+    }
+  }
+
   /// Desconecta do servidor SIP
   Future<void> disconnect() async {
     try {
       _logger.i('Desconectando VoIP Engine...');
-
-      // Cancelar timer de reconexão
-      _reconnectTimer?.cancel();
 
       // Finalizar todas as chamadas
       for (final callId in _activeCalls.keys.toList()) {
         await hangupCall(callId);
       }
 
-      // Parar User Agent
-      _userAgent?.stop();
-
-      // Limpar estado
       _activeCalls.clear();
-      _sipCalls.clear();
-      _conferences.clear();
       _isConnected = false;
       _isRegistered = false;
       _currentUser = null;
-      _reconnectAttempts = 0;
 
       _updateState(VoipEngineState.disconnected);
       _notifyCallsUpdate();
@@ -605,11 +439,6 @@ class VoipEngine {
 
   /// Utilitários
   CallModel? getCall(String callId) => _activeCalls[callId];
-
-  List<MediaDeviceInfo> get availableMicrophones => _audioInputs;
-  List<MediaDeviceInfo> get availableSpeakers => _audioOutputs;
-  String? get selectedMicrophone => _selectedMicrophone;
-  String? get selectedSpeaker => _selectedSpeaker;
 
   void _updateCallState(String callId, CallState state) {
     final call = _activeCalls[callId];
@@ -628,10 +457,9 @@ class VoipEngine {
   }
 
   void dispose() {
-    _reconnectTimer?.cancel();
     _callsController.close();
     _stateController.close();
-    _userAgent?.stop();
+    _peerConnection?.dispose();
   }
 }
 
