@@ -6,7 +6,6 @@ import 'presentation/themes/app_theme.dart';
 import 'presentation/screens/login/login_screen.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
 import 'presentation/providers/auth_provider.dart';
-import 'core/utils/navigation_service.dart';
 
 class DispatcheurApp extends ConsumerWidget {
   const DispatcheurApp({super.key});
@@ -24,9 +23,9 @@ class DispatcheurApp extends ConsumerWidget {
       routerConfig: _createRouter(authState.isAuthenticated),
       builder: (context, child) {
         return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaleFactor: 1.0, // Fixar escala de texto
-          ),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.noScaling),
           child: child!,
         );
       },
@@ -35,15 +34,16 @@ class DispatcheurApp extends ConsumerWidget {
 
   GoRouter _createRouter(bool isAuthenticated) {
     return GoRouter(
-      navigatorKey: NavigationService.navigatorKey,
       initialLocation: isAuthenticated ? '/dashboard' : '/login',
       routes: [
         GoRoute(
           path: '/login',
+          name: 'login',
           builder: (context, state) => const LoginScreen(),
         ),
         GoRoute(
           path: '/dashboard',
+          name: 'dashboard',
           builder: (context, state) => const DashboardScreen(),
         ),
       ],

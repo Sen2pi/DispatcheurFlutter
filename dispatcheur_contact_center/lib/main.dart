@@ -5,50 +5,62 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
-import 'core/di/injection.dart';
-import 'core/constants/app_constants.dart';
-import 'core/utils/logger.dart';
 import 'app.dart';
+import 'core/di/injection.dart';
+import 'services/notification_service.dart';
+import 'data/models/call_model.dart';
+import 'data/models/contact_model.dart';
+import 'data/models/note_model.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     // Configurar orientação
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
 
     // Carregar variáveis de ambiente
     await dotenv.load(fileName: ".env");
-    AppLogger.info('Variáveis de ambiente carregadas');
 
     // Inicializar Hive
     await Hive.initFlutter();
-    AppLogger.info('Hive inicializado');
+
+    // Registrar adaptadores Hive
+    Hive.registerAdapter(CallModelAdapter());
+    Hive.registerAdapter(ContactModelAdapter());
+    Hive.registerAdapter(NoteModelAdapter());
+
+    // Abrir boxes Hive
+    await Hive.openBox<CallModel>('calls');
+    await Hive.openBox<ContactModel>('contacts');
+    await Hive.openBox<NoteModel>('notes');
+    await Hive.openBox('settings');
 
     // Configurar injeção de dependências
-    await configureDependencies();
-    AppLogger.info('Dependências configuradas');
+    configureDependencies();
 
     // Configurar notificações
     await _initializeNotifications();
-    AppLogger.info('Notificações configuradas');
 
-    // Solicitar permissões críticas
-    await _requestCriticalPermissions();
-    AppLogger.info('Permissões solicitadas');
+    // Solicitar permissões
+    await _requestPermissions();
+
+    // Configurar status bar
+    await _configureSystemUI();
 
     runApp(const ProviderScope(child: DispatcheurApp()));
-  } catch (e, stackTrace) {
-    AppLogger.error('Erro na inicialização da app', e, stackTrace);
+  } catch (e) {
+    debugPrint('Erro na inicialização: $e');
     runApp(
       MaterialApp(
         home: Scaffold(
@@ -74,69 +86,74 @@ Future<void> main() async {
 }
 
 Future<void> _initializeNotifications() async {
-  // Awesome Notifications
-  await AwesomeNotifications().initialize(null, [
-    NotificationChannel(
-      channelKey: AppConstants.notificationChannelKey,
-      channelName: 'DispatcheurCC VoIP',
-      channelDescription: 'Notificações de chamadas VoIP',
-      defaultColor: const Color(0xFF3B82F6),
-      ledColor: Colors.blue,
-      importance: NotificationImportance.High,
-      enableVibration: true,
-      enableLights: true,
-      playSound: true,
-      criticalAlerts: true,
-    ),
-  ]);
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
 
-  // Local Notifications
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
+  final iosSettings = DarwinInitializationSettings(
+    requestSoundPermission: true,
+    requestBadgePermission: true,
+    requestAlertPermission: true,
+    onDidReceiveLocalNotification: (id, title, body, payload) async {
+      debugPrint('Notificação iOS recebida: $title');
+    },
+  );
 
-  const DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings(
-        requestSoundPermission: true,
-        requestBadgePermission: true,
-        requestAlertPermission: true,
-        requestCriticalPermission: true,
-      );
-
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsIOS,
-    macOS: initializationSettingsIOS,
+  const initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
+    macOS: iosSettings,
   );
 
   await flutterLocalNotificationsPlugin.initialize(
-    initializationSettings,
-    onDidReceiveNotificationResponse: (NotificationResponse response) {
-      AppLogger.info('Notificação clicada: ${response.payload}');
+    initSettings,
+    onDidReceiveNotificationResponse: (details) {
+      debugPrint('Notificação clicada: ${details.payload}');
     },
   );
 }
 
-Future<void> _requestCriticalPermissions() async {
-  final permissions = [Permission.microphone, Permission.notification];
+Future<void> _requestPermissions() async {
+  final deviceInfo = DeviceInfoPlugin();
 
-  // Adicionar permissões específicas do Android
+  // Permissões básicas
+  final permissions = <Permission>[
+    Permission.microphone,
+    Permission.camera,
+    Permission.notification,
+  ];
+
+  // Permissões específicas do Android
   if (Theme.of(
-        WidgetsBinding.instance.focusManager.primaryFocus?.context ??
-            NavigationService.navigatorKey.currentContext!,
+        WidgetsBinding.instance.platformDispatcher.views.first,
       ).platform ==
       TargetPlatform.android) {
-    permissions.addAll([Permission.phone, Permission.systemAlertWindow]);
-  }
+    final androidInfo = await deviceInfo.androidInfo;
 
-  final statuses = await permissions.request();
+    permissions.addAll([Permission.phone, Permission.audio]);
 
-  for (final entry in statuses.entries) {
-    if (entry.value.isPermanentlyDenied) {
-      AppLogger.warning('Permissão ${entry.key} negada permanentemente');
-    } else if (entry.value.isDenied) {
-      AppLogger.warning('Permissão ${entry.key} negada');
-    } else {
-      AppLogger.info('Permissão ${entry.key} concedida');
+    // Para Android 13+
+    if (androidInfo.version.sdkInt >= 33) {
+      permissions.add(Permission.notification);
     }
   }
+
+  // Solicitar permissões
+  final statuses = await permissions.request();
+
+  // Log dos resultados
+  statuses.forEach((permission, status) {
+    debugPrint('$permission: $status');
+  });
+}
+
+Future<void> _configureSystemUI() async {
+  // Configurar cores da status bar
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
 }
